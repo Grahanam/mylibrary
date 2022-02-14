@@ -5,6 +5,9 @@ const Book = require('../models/book')
 const Author = require('../models/author')
 const imageMimeTypes = ['image/jpeg', 'image/png', 'images/gif']
 
+//firebase cloud storage
+const{ getStorage, ref,uploadBytes,uploadBytesResumable,getDownloadURL,deleteObject } =require("firebase/storage")
+const firebaseStorage = require('../firebase')
 
 // All Books Route
 router.get('/', async (req, res) => {
@@ -36,21 +39,36 @@ router.get('/new', async (req, res) => {
 
 // Create Book Route
 router.post('/', async (req, res) => {
-  
+  const pdf = req.files.pdf;
+
   const book = new Book({
     title: req.body.title,
     author: req.body.author,
     publishDate: new Date(req.body.publishDate),
     pageCount: req.body.pageCount,
-    description: req.body.description
+    description: req.body.description,
   })
-  saveCover(book,req.body.cover)
   try {
-    const newBook = await book.save()
+    console.log('file uploading in process please wait.....')
+    saveCover(book, req.body.cover)
+  const filename=Number(new Date()).toString()+pdf.name;
+  book.filename =filename 
+
+  const metadata = {
+    contentType: pdf.mimetype,
+  };
+  const storageref=ref(firebaseStorage,'mylibrary/'+filename)
+  await uploadBytes(storageref, pdf.data,metadata).then((snapshot) => {
+    console.log('File succesfully uploaded in cloud storage!');
+    
+  });
+   let url = await getDownloadURL(storageref);
+   book.pdf=url;
+   const newBook = await book.save()
     // res.redirect(`books/${newBook.id}`)
     res.redirect(`books`)
-  } catch {
-   
+  } catch (err){
+    console.log(err)
     renderNewPage(res, book, true)
   }
 })
@@ -107,7 +125,13 @@ router.delete('/:id', async (req, res) => {
   let book
   try {
     book = await Book.findById(req.params.id)
+    const filename=book.filename;
     await book.remove()
+    const deleteref=ref(firebaseStorage,'mylibrary/'+filename)
+    await deleteObject(deleteref).then(() => {
+      console.log('file deleted successfully from cloud storage')
+    })
+    
     res.redirect('/books')
   } catch {
     if (book != null) {

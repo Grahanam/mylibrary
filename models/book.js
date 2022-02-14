@@ -33,6 +33,14 @@ const bookSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Author'
+  },
+  pdf:{
+    type:String,
+    required:true
+  },
+  filename:{
+    type:String,
+    required:true
   }
 })
 
